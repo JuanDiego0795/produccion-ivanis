@@ -29,8 +29,19 @@ function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Configuracion de Supabase incompleta')
+  // Debug: log which env vars are available
+  console.log('[Admin API] ENV Check:', {
+    hasUrl: !!supabaseUrl,
+    hasServiceKey: !!serviceRoleKey,
+    urlPrefix: supabaseUrl?.substring(0, 20),
+  })
+
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL no disponible en runtime')
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY no disponible en runtime')
   }
 
   return createClient(supabaseUrl, serviceRoleKey, {

@@ -9,10 +9,16 @@ frontend:
         - test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || (echo "ERROR NEXT_PUBLIC_SUPABASE_ANON_KEY not set" && exit 1)
         - test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "ERROR SUPABASE_SERVICE_ROLE_KEY not set" && exit 1)
         - echo "Environment OK"
+        - echo "Creating .env.production for SSR runtime"
+        - echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" >> .env.production
+        - echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> .env.production
+        - echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> .env.production
     build:
       commands:
         - echo "Building Next.js app"
         - npm run build
+        - echo "Copying env to .next for SSR"
+        - cp .env.production .next/.env.production
   artifacts:
     baseDirectory: .next
     files:
