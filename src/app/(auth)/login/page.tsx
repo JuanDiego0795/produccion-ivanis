@@ -14,10 +14,10 @@ import { useAuthStore } from '@/stores/auth-store'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { user, setUser, setProfile, setAuthReady } = useAuthStore()
+  const { user, setUser, setProfile, setAuthReady, setLoading: setStoreLoading, setInitialized } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
 
   // Detectar si la sesion expiro por inactividad
@@ -45,7 +45,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setSubmitting(true)
     setSessionExpired(false)
 
     try {
@@ -65,8 +65,10 @@ export default function LoginPage() {
         return
       }
 
-      // Actualizar estado local
+      // Actualizar estado del store ANTES de navegar
       setUser(data.user)
+      setStoreLoading(false)
+      setInitialized(true)
       setAuthReady(true)
 
       // Cargar perfil
@@ -81,7 +83,7 @@ export default function LoginPage() {
     } catch {
       toast.error('Error al iniciar sesion. Intenta de nuevo.')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -115,7 +117,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              disabled={loading}
+              disabled={submitting}
             />
           </div>
           <div className="space-y-2">
@@ -127,14 +129,14 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={loading}
+              disabled={submitting}
               minLength={6}
             />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Ingresando...
