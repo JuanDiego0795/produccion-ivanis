@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
+// Forzar renderizado dinamico - esta pagina usa cookies
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   try {
     const supabase = await createClient()
