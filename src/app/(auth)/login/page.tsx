@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +14,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { user } = useAuthStore()
+  const { user, setUser, setProfile, setAuthReady } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,7 +36,7 @@ export default function LoginPage() {
     checkExpiredSession()
   }, [])
 
-  // Redirigir si ya esta autenticado (no requiere profile)
+  // Redirigir si ya esta autenticado
   useEffect(() => {
     if (user) {
       router.push('/dashboard')
@@ -50,23 +49,35 @@ export default function LoginPage() {
     setSessionExpired(false)
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
       })
 
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Credenciales incorrectas. Verifica tu email y contrasena.')
-        } else {
-          toast.error(error.message)
-        }
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error || 'Error al iniciar sesion')
         return
       }
 
+      // Actualizar estado local
+      setUser(data.user)
+      setAuthReady(true)
+
+      // Cargar perfil
+      const meResponse = await fetch('/api/auth/me', { credentials: 'include' })
+      if (meResponse.ok) {
+        const meData = await meResponse.json()
+        setProfile(meData.profile)
+      }
+
       toast.success('Bienvenido!')
-      // La navegación ocurrirá automáticamente via el useEffect cuando user y profile estén disponibles
+      router.push('/dashboard')
     } catch {
       toast.error('Error al iniciar sesion. Intenta de nuevo.')
     } finally {
