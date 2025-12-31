@@ -38,24 +38,41 @@ export interface ServerAuthState {
 
 // Obtiene el estado completo de auth para hidratar el cliente
 export async function getServerAuthState(): Promise<ServerAuthState> {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  // Usar getUser() en vez de getSession() - más seguro
-  const { data: { user }, error } = await supabase.auth.getUser()
+    // Usar getUser() en vez de getSession() - más seguro
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (error || !user) {
+    if (error || !user) {
+      return { user: null, profile: null, session: null }
+    }
+
+    // Cargar perfil del usuario (con manejo de errores)
+    let profile = null
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      profile = profileData
+    } catch {
+      console.warn('Failed to fetch profile for user:', user.id)
+    }
+
+    // Obtener sesión con tokens
+    let session = null
+    try {
+      const { data: { session: sessionData } } = await supabase.auth.getSession()
+      session = sessionData
+    } catch {
+      console.warn('Failed to fetch session')
+    }
+
+    return { user, profile, session }
+  } catch (error) {
+    console.error('getServerAuthState error:', error)
     return { user: null, profile: null, session: null }
   }
-
-  // Cargar perfil del usuario
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  // Obtener sesión con tokens
-  const { data: { session } } = await supabase.auth.getSession()
-
-  return { user, profile, session }
 }
