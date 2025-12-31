@@ -29,13 +29,6 @@ function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  // Debug: log which env vars are available
-  console.log('[Admin API] ENV Check:', {
-    hasUrl: !!supabaseUrl,
-    hasServiceKey: !!serviceRoleKey,
-    urlPrefix: supabaseUrl?.substring(0, 20),
-  })
-
   if (!supabaseUrl) {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL no disponible en runtime')
   }
@@ -52,9 +45,9 @@ function getAdminClient() {
   })
 }
 
+// GET - Listar usuarios
 export async function GET() {
   try {
-    // Verificar admin
     const authResult = await verifyAdmin()
     if ('error' in authResult) {
       return NextResponse.json(
@@ -65,32 +58,21 @@ export async function GET() {
 
     const adminClient = getAdminClient()
 
-    // Obtener usuarios de auth
     const { data: authUsers, error: authError } = await adminClient.auth.admin.listUsers()
 
     if (authError) {
-      console.error('[Admin API] Auth error:', authError)
-      return NextResponse.json(
-        { error: authError.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: authError.message }, { status: 500 })
     }
 
-    // Obtener perfiles
     const { data: profiles, error: profilesError } = await adminClient
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false })
 
     if (profilesError) {
-      console.error('[Admin API] Profiles error:', profilesError)
-      return NextResponse.json(
-        { error: profilesError.message },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: profilesError.message }, { status: 500 })
     }
 
-    // Combinar datos
     const users = profiles?.map((profile) => {
       const authUser = authUsers.users.find((u) => u.id === profile.id)
       return {
@@ -103,7 +85,154 @@ export async function GET() {
 
     return NextResponse.json({ users })
   } catch (error) {
-    console.error('[Admin API] Error:', error)
+    console.error('[Admin API] GET Error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Crear usuario
+export async function POST(request: Request) {
+  try {
+    const authResult = await verifyAdmin()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { email, password, fullName, role } = await request.json()
+
+    if (!email || !password || !fullName) {
+      return NextResponse.json(
+        { error: 'Email, password y nombre son requeridos' },
+        { status: 400 }
+      )
+    }
+
+    const adminClient = getAdminClient()
+
+    // Crear usuario en auth
+    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
+    })
+
+    if (authError) {
+      return NextResponse.json({ error: authError.message }, { status: 500 })
+    }
+
+    if (!authData.user) {
+      return NextResponse.json({ error: 'Error al crear usuario' }, { status: 500 })
+    }
+
+    // Actualizar perfil con rol
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update({ full_name: fullName, role: role || 'employee' })
+      .eq('id', authData.user.id)
+
+    if (profileError) {
+      // Si falla update, intentar insert
+      await adminClient.from('profiles').insert({
+        id: authData.user.id,
+        full_name: fullName,
+        role: role || 'employee',
+      })
+    }
+
+    return NextResponse.json({ success: true, userId: authData.user.id })
+  } catch (error) {
+    console.error('[Admin API] POST Error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno' },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH - Actualizar rol de usuario
+export async function PATCH(request: Request) {
+  try {
+    const authResult = await verifyAdmin()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { userId, role } = await request.json()
+
+    if (!userId || !role) {
+      return NextResponse.json(
+        { error: 'userId y role son requeridos' },
+        { status: 400 }
+      )
+    }
+
+    const adminClient = getAdminClient()
+
+    const { error } = await adminClient
+      .from('profiles')
+      .update({ role })
+      .eq('id', userId)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[Admin API] PATCH Error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Eliminar usuario
+export async function DELETE(request: Request) {
+  try {
+    const authResult = await verifyAdmin()
+    if ('error' in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { userId } = await request.json()
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId es requerido' }, { status: 400 })
+    }
+
+    // Prevenir auto-eliminacion
+    if (authResult.user.id === userId) {
+      return NextResponse.json(
+        { error: 'No puedes eliminar tu propia cuenta' },
+        { status: 400 }
+      )
+    }
+
+    const adminClient = getAdminClient()
+
+    const { error } = await adminClient.auth.admin.deleteUser(userId)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[Admin API] DELETE Error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error interno' },
       { status: 500 }
