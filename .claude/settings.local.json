@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx shadcn@latest add button card input label form select dialog alert-dialog dropdown-menu tabs sonner avatar badge calendar popover sheet table textarea checkbox radio-group switch skeleton separator -y)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}
