@@ -4,28 +4,18 @@ frontend:
     preBuild:
       commands:
         - npm ci
-        # Verify environment variables are set
-        - echo "Checking environment variables..."
-        - |
-          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
-            echo "ERROR: NEXT_PUBLIC_SUPABASE_URL is not set"
-            exit 1
-          fi
-        - |
-          if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "ERROR: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set"
-            exit 1
-          fi
-        - echo "Environment variables verified successfully"
+        - echo "Verifying environment variables"
+        - test -n "$NEXT_PUBLIC_SUPABASE_URL" || (echo "ERROR NEXT_PUBLIC_SUPABASE_URL not set" && exit 1)
+        - test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || (echo "ERROR NEXT_PUBLIC_SUPABASE_ANON_KEY not set" && exit 1)
+        - echo "Environment OK"
     build:
       commands:
-        # Environment variables from Amplify console are automatically available
-        - echo "Building with Supabase URL: ${NEXT_PUBLIC_SUPABASE_URL}"
+        - echo "Building Next.js app"
         - npm run build
   artifacts:
     baseDirectory: .next
     files:
-      - '**/*'
+      - "**/*"
   cache:
     paths:
       - node_modules/**/*
