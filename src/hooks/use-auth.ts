@@ -13,7 +13,10 @@ export function useAuth() {
     loading,
     initialized,
     isRefreshing,
+    isAuthReady,
+    authError,
     setProfile,
+    setAuthError,
     reset
   } = useAuthStore()
 
@@ -21,20 +24,17 @@ export function useAuth() {
     try {
       const supabase = createClient()
       await supabase.auth.signOut()
-
-      // Invalidar cliente para obtener instancia fresca
+    } catch (error) {
+      console.warn('Error signing out:', error)
+    } finally {
+      // Siempre limpiar estado, incluso si hay error
       invalidateClient()
 
       // Limpiar cookie de actividad
-      document.cookie = 'last_activity=; Max-Age=0; path=/'
+      if (typeof document !== 'undefined') {
+        document.cookie = 'last_activity=; Max-Age=0; path=/'
+      }
 
-      reset()
-      router.push('/login')
-      router.refresh()
-    } catch (error) {
-      console.error('Error signing out:', error)
-      // Force reset even on error
-      invalidateClient()
       reset()
       router.push('/login')
     }
@@ -45,18 +45,32 @@ export function useAuth() {
 
     try {
       const supabase = createClient()
-      const { data: profileData } = await supabase
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
 
+      if (error) {
+        setAuthError({
+          code: 'profile_fetch_failed',
+          message: 'No se pudo actualizar el perfil',
+          recoverable: true
+        })
+        return
+      }
+
       if (profileData) {
         setProfile(profileData)
+        setAuthError(null)
       }
     } catch (error) {
       console.error('Error refreshing profile:', error)
     }
+  }
+
+  const clearAuthError = () => {
+    setAuthError(null)
   }
 
   const isAdmin = profile?.role === 'admin'
@@ -64,14 +78,22 @@ export function useAuth() {
   const canEdit = isAdmin || isEmployee
 
   return {
+    // Estado
     user,
     profile,
     session,
     loading,
     initialized,
     isRefreshing,
+    isAuthReady,
+    authError,
+
+    // Acciones
     signOut,
     refreshProfile,
+    clearAuthError,
+
+    // Helpers de rol
     isAdmin,
     isEmployee,
     canEdit,

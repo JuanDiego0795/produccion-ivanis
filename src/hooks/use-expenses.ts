@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Expense } from '@/types/database'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAuthQuery } from './use-auth-query'
 
 interface ExpenseSummary {
   totalExpenses: number
@@ -18,34 +19,29 @@ interface ExpenseSummary {
 }
 
 export function useExpenses() {
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { user } = useAuthStore()
+  const [mutating, setMutating] = useState(false)
 
-  const fetchExpenses = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const supabase = createClient()
+  // Usar useAuthQuery para fetch - espera a que auth este listo
+  const {
+    data: expenses,
+    loading: queryLoading,
+    error,
+    isAuthError,
+    refetch: fetchExpenses
+  } = useAuthQuery<Expense[]>({
+    queryFn: async (supabase) => {
       const { data, error: fetchError } = await supabase
         .from('expenses')
         .select('*')
         .order('date', { ascending: false })
 
       if (fetchError) throw fetchError
-      setExpenses(data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar gastos')
-    } finally {
-      setLoading(false)
+      return data || []
     }
-  }, [])
+  })
 
-  useEffect(() => {
-    fetchExpenses()
-  }, [fetchExpenses])
+  const loading = queryLoading || mutating
 
   const createExpense = async (expenseData: {
     type: string
@@ -57,48 +53,64 @@ export function useExpenses() {
     supplier?: string | null
   }) => {
     if (!user) throw new Error('Usuario no autenticado')
+    setMutating(true)
 
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert({
-        ...expenseData,
-        created_by: user.id,
-      })
-      .select()
-      .single()
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert({
+          ...expenseData,
+          created_by: user.id,
+        })
+        .select()
+        .single()
 
-    if (error) throw error
-    await fetchExpenses()
-    return data
+      if (error) throw error
+      await fetchExpenses()
+      return data
+    } finally {
+      setMutating(false)
+    }
   }
 
   const updateExpense = async (id: string, updates: Partial<Expense>) => {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('expenses')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+    setMutating(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('expenses')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
 
-    if (error) throw error
-    await fetchExpenses()
-    return data
+      if (error) throw error
+      await fetchExpenses()
+      return data
+    } finally {
+      setMutating(false)
+    }
   }
 
   const deleteExpense = async (id: string) => {
-    const supabase = createClient()
-    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    setMutating(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('expenses').delete().eq('id', id)
 
-    if (error) throw error
-    await fetchExpenses()
+      if (error) throw error
+      await fetchExpenses()
+    } finally {
+      setMutating(false)
+    }
   }
 
   return {
-    expenses,
+    expenses: expenses || [],
     loading,
     error,
+    isAuthError,
     fetchExpenses,
     createExpense,
     updateExpense,
@@ -107,17 +119,15 @@ export function useExpenses() {
 }
 
 export function useFinancialSummary() {
-  const [summary, setSummary] = useState<ExpenseSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchSummary = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const supabase = createClient()
-
+  // Usar useAuthQuery para fetch - espera a que auth este listo
+  const {
+    data: summary,
+    loading,
+    error,
+    isAuthError,
+    refetch: fetchSummary
+  } = useAuthQuery<ExpenseSummary>({
+    queryFn: async (supabase) => {
       // Fetch expenses
       const { data: expensesData, error: expensesError } = await supabase
         .from('expenses')
@@ -138,8 +148,8 @@ export function useFinancialSummary() {
       const soldPigs = soldPigsData as Array<{ sale_price: number; sale_date: string | null }> | null
 
       // Calculate totals
-      const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0
-      const totalIncome = soldPigs?.reduce((sum, p) => sum + Number(p.sale_price), 0) || 0
+      const totalExpenses = expenses?.reduce((sum: number, e) => sum + Number(e.amount), 0) || 0
+      const totalIncome = soldPigs?.reduce((sum: number, p) => sum + Number(p.sale_price), 0) || 0
       const balance = totalIncome - totalExpenses
 
       // Expenses by type
@@ -157,10 +167,10 @@ export function useFinancialSummary() {
         const monthLabel = date.toLocaleDateString('es', { month: 'short', year: '2-digit' })
 
         const monthExpenses = expenses?.filter((e) => e.date.startsWith(monthKey))
-          .reduce((sum, e) => sum + Number(e.amount), 0) || 0
+          .reduce((sum: number, e) => sum + Number(e.amount), 0) || 0
 
         const monthIncome = soldPigs?.filter((p) => p.sale_date?.startsWith(monthKey))
-          .reduce((sum, p) => sum + Number(p.sale_price), 0) || 0
+          .reduce((sum: number, p) => sum + Number(p.sale_price), 0) || 0
 
         monthlyData.push({
           month: monthLabel,
@@ -169,28 +179,21 @@ export function useFinancialSummary() {
         })
       }
 
-      setSummary({
+      return {
         totalExpenses,
         totalIncome,
         balance,
         expensesByType,
         monthlyData,
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar resumen')
-    } finally {
-      setLoading(false)
+      }
     }
-  }, [])
-
-  useEffect(() => {
-    fetchSummary()
-  }, [fetchSummary])
+  })
 
   return {
     summary,
     loading,
     error,
+    isAuthError,
     fetchSummary,
   }
 }

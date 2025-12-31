@@ -15,7 +15,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { user, profile } = useAuthStore()
+  const { user } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,12 +37,12 @@ export default function LoginPage() {
     checkExpiredSession()
   }, [])
 
-  // Redirigir si ya esta autenticado
+  // Redirigir si ya esta autenticado (no requiere profile)
   useEffect(() => {
-    if (user && profile) {
+    if (user) {
       router.push('/dashboard')
     }
-  }, [user, profile, router])
+  }, [user, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

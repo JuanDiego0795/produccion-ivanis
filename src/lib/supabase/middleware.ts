@@ -98,9 +98,9 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    // Actualizar timestamp de última actividad
+    // Actualizar timestamp de ultima actividad (httpOnly para seguridad)
     supabaseResponse.cookies.set('last_activity', Date.now().toString(), {
-      httpOnly: false,
+      httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: INACTIVITY_TIMEOUT_MS / 1000,

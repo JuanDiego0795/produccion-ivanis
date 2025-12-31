@@ -4,54 +4,55 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Pig, PigInsert, WeightRecord, WeightRecordInsert } from '@/types/database'
 import { useAuthStore } from '@/stores/auth-store'
+import { useAuthQuery } from './use-auth-query'
 
 export function usePigs() {
-  const [pigs, setPigs] = useState<Pig[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { user } = useAuthStore()
+  const [mutating, setMutating] = useState(false)
 
-  const fetchPigs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const supabase = createClient()
+  // Usar useAuthQuery para fetch - espera a que auth este listo
+  const {
+    data: pigs,
+    loading: queryLoading,
+    error,
+    isAuthError,
+    refetch: fetchPigs
+  } = useAuthQuery<Pig[]>({
+    queryFn: async (supabase) => {
       const { data, error: fetchError } = await supabase
         .from('pigs')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
-      setPigs(data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar cerdos')
-    } finally {
-      setLoading(false)
+      return data || []
     }
-  }, [])
+  })
 
-  useEffect(() => {
-    fetchPigs()
-  }, [fetchPigs])
+  const loading = queryLoading || mutating
 
   const createPig = async (pigData: Omit<PigInsert, 'created_by'>) => {
     if (!user) throw new Error('Usuario no autenticado')
+    setMutating(true)
 
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from('pigs')
-      .insert({
-        ...pigData,
-        created_by: user.id,
-        current_weight: pigData.purchase_weight,
-      })
-      .select()
-      .single()
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('pigs')
+        .insert({
+          ...pigData,
+          created_by: user.id,
+          current_weight: pigData.purchase_weight,
+        })
+        .select()
+        .single()
 
-    if (error) throw error
-    await fetchPigs()
-    return data
+      if (error) throw error
+      await fetchPigs()
+      return data
+    } finally {
+      setMutating(false)
+    }
   }
 
   const createMultiplePigs = async (
@@ -163,9 +164,10 @@ export function usePigs() {
   }
 
   return {
-    pigs,
+    pigs: pigs || [],
     loading,
     error,
+    isAuthError,
     fetchPigs,
     createPig,
     createMultiplePigs,
@@ -177,19 +179,18 @@ export function usePigs() {
 }
 
 export function usePig(id: string) {
-  const [pig, setPig] = useState<Pig | null>(null)
-  const [weightRecords, setWeightRecords] = useState<WeightRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { user } = useAuthStore()
+  const [mutating, setMutating] = useState(false)
 
-  const fetchPig = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const supabase = createClient()
-
+  // Usar useAuthQuery para fetch - espera a que auth este listo
+  const {
+    data,
+    loading: queryLoading,
+    error,
+    isAuthError,
+    refetch: fetchPig
+  } = useAuthQuery<{ pig: Pig; weightRecords: WeightRecord[] }>({
+    queryFn: async (supabase) => {
       const [pigResult, weightsResult] = await Promise.all([
         supabase.from('pigs').select('*').eq('id', id).single(),
         supabase
@@ -202,53 +203,54 @@ export function usePig(id: string) {
       if (pigResult.error) throw pigResult.error
       if (weightsResult.error) throw weightsResult.error
 
-      setPig(pigResult.data)
-      setWeightRecords(weightsResult.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar cerdo')
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
+      return {
+        pig: pigResult.data,
+        weightRecords: weightsResult.data || []
+      }
+    },
+    enabled: !!id
+  })
 
-  useEffect(() => {
-    if (id) {
-      fetchPig()
-    }
-  }, [id, fetchPig])
+  const loading = queryLoading || mutating
 
-  const addWeightRecord = async (data: Omit<WeightRecordInsert, 'pig_id' | 'created_by'>) => {
+  const addWeightRecord = async (recordData: Omit<WeightRecordInsert, 'pig_id' | 'created_by'>) => {
     if (!user) throw new Error('Usuario no autenticado')
+    setMutating(true)
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    // Add weight record
-    const { error: weightError } = await supabase
-      .from('weight_records')
-      .insert({
-        ...data,
-        pig_id: id,
-        created_by: user.id,
-      })
+      // Add weight record
+      const { error: weightError } = await supabase
+        .from('weight_records')
+        .insert({
+          ...recordData,
+          pig_id: id,
+          created_by: user.id,
+        })
 
-    if (weightError) throw weightError
+      if (weightError) throw weightError
 
-    // Update current_weight on pig
-    const { error: pigError } = await supabase
-      .from('pigs')
-      .update({ current_weight: data.weight })
-      .eq('id', id)
+      // Update current_weight on pig
+      const { error: pigError } = await supabase
+        .from('pigs')
+        .update({ current_weight: recordData.weight })
+        .eq('id', id)
 
-    if (pigError) throw pigError
+      if (pigError) throw pigError
 
-    await fetchPig()
+      await fetchPig()
+    } finally {
+      setMutating(false)
+    }
   }
 
   return {
-    pig,
-    weightRecords,
+    pig: data?.pig || null,
+    weightRecords: data?.weightRecords || [],
     loading,
     error,
+    isAuthError,
     fetchPig,
     addWeightRecord,
   }
