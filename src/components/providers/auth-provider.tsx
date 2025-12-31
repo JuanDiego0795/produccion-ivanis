@@ -21,17 +21,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMountedRef = useRef(true)
   const initializedRef = useRef(false)
 
-  // Verificar autenticacion via API
+  // Verificar autenticacion via API con timeout
   const checkAuth = useCallback(async () => {
     if (initializedRef.current) return
     initializedRef.current = true
 
     console.log('[AuthProvider] Checking authentication via API')
 
+    // Crear controller para timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos
+
     try {
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       if (!isMountedRef.current) return
 
@@ -44,12 +51,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setAuthError(null)
       } else {
         // No autenticado - es normal para login page
-        console.log('[AuthProvider] Not authenticated')
+        console.log('[AuthProvider] Not authenticated, status:', response.status)
         reset()
       }
     } catch (error) {
-      console.warn('[AuthProvider] Auth check error:', error)
+      clearTimeout(timeoutId)
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn('[AuthProvider] Auth check timeout')
+      } else {
+        console.warn('[AuthProvider] Auth check error:', error)
+      }
+
       if (isMountedRef.current) {
+        // En caso de error, resetear para permitir login
+        reset()
         setAuthError({
           code: 'network_error',
           message: 'Error de conexion',

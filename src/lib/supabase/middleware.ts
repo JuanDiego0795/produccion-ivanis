@@ -44,15 +44,19 @@ export async function updateSession(request: NextRequest) {
     console.warn('Middleware auth check failed:', error)
   }
 
-  // Rutas públicas
-  const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password']
+  // Rutas públicas (incluye API de auth)
+  const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/api/auth']
   const isPublicPath = publicPaths.some(path =>
     request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path)
   )
 
   // Si es ruta pública, permitir acceso
   if (isPublicPath) {
-    // Pero si está autenticado, redirigir al dashboard
+    // Las rutas API siempre pasan sin redirect
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return supabaseResponse
+    }
+    // Si está autenticado en paginas de auth, redirigir al dashboard
     if (user) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
