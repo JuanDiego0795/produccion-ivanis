@@ -6,10 +6,15 @@ let client: SupabaseClient | null = null
 
 export function createClient() {
   if (!client) {
-    client = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing Supabase environment variables')
+      throw new Error('Supabase configuration not available')
+    }
+
+    client = createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
   return client
 }
