@@ -7,6 +7,7 @@ frontend:
         - echo "Verifying environment variables"
         - test -n "$NEXT_PUBLIC_SUPABASE_URL" || (echo "ERROR NEXT_PUBLIC_SUPABASE_URL not set" && exit 1)
         - test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || (echo "ERROR NEXT_PUBLIC_SUPABASE_ANON_KEY not set" && exit 1)
+        - test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "ERROR SUPABASE_SERVICE_ROLE_KEY not set" && exit 1)
         - echo "Environment OK"
     build:
       commands:

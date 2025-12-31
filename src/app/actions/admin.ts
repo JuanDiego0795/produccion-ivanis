@@ -6,8 +6,16 @@ import type { UserRole } from '@/types/database'
 
 // Admin client with service role key for user management
 function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL no esta configurada')
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY no esta configurada en el servidor. Contacta al administrador.')
+  }
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
