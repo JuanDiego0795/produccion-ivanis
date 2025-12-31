@@ -135,7 +135,7 @@ export default function ReportsPage() {
             p.status === 'active' ? 'Activo' : p.status === 'sold' ? 'Vendido' : 'Baja',
             format(new Date(p.purchase_date), 'd/MM/yyyy'),
             `$${p.purchase_price.toLocaleString()}`,
-            p.current_weight ? `${p.current_weight} kg` : '-',
+            p.current_weight ? `${p.current_weight} lb` : '-',
           ]),
         })
       } else if (reportType === 'finances') {

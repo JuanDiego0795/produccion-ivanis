@@ -289,7 +289,7 @@ export default function PigDetailPage() {
               <div className="flex items-center gap-2">
                 <Scale className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  {pig.current_weight ? `${pig.current_weight} kg` : 'Sin peso'}
+                  {pig.current_weight ? `${pig.current_weight} lb` : 'Sin peso'}
                 </span>
               </div>
             </div>
@@ -305,11 +305,11 @@ export default function PigDetailPage() {
                 <p className="text-2xl font-bold">
                   {weightGain ? `${weightGain.toFixed(1)}` : '-'}
                 </p>
-                <p className="text-xs text-muted-foreground">kg ganados</p>
+                <p className="text-xs text-muted-foreground">lb ganadas</p>
               </div>
               <div>
                 <p className="text-2xl font-bold">{dailyGain || '-'}</p>
-                <p className="text-xs text-muted-foreground">kg/dia</p>
+                <p className="text-xs text-muted-foreground">lb/dia</p>
               </div>
             </div>
 
@@ -373,7 +373,7 @@ export default function PigDetailPage() {
                   <form onSubmit={weightForm.handleSubmit(handleAddWeight)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Peso (kg)</Label>
+                        <Label>Peso (lb)</Label>
                         <Input
                           type="number"
                           step="0.1"
@@ -470,7 +470,7 @@ export default function PigDetailPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Peso Final (kg) - Opcional</Label>
+                    <Label>Peso Final (lb) - Opcional</Label>
                     <Input
                       type="number"
                       step="0.1"
@@ -603,7 +603,7 @@ export default function PigDetailPage() {
             {pig.purchase_weight && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Peso al comprar</span>
-                <span>{pig.purchase_weight} kg</span>
+                <span>{pig.purchase_weight} lb</span>
               </div>
             )}
           </CardContent>

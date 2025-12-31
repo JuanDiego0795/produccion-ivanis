@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -8,18 +8,46 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import { Loader2, LogIn } from 'lucide-react'
+import { Loader2, LogIn, AlertCircle } from 'lucide-react'
+import { useAuthStore } from '@/stores/auth-store'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { user, profile } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  // Detectar si la sesion expiro por inactividad
+  useEffect(() => {
+    const checkExpiredSession = () => {
+      const cookies = document.cookie.split(';')
+      const expiredCookie = cookies.find(c => c.trim().startsWith('session_expired='))
+
+      if (expiredCookie) {
+        setSessionExpired(true)
+        // Limpiar cookie
+        document.cookie = 'session_expired=; Max-Age=0; path=/'
+      }
+    }
+
+    checkExpiredSession()
+  }, [])
+
+  // Redirigir si ya esta autenticado
+  useEffect(() => {
+    if (user && profile) {
+      router.push('/dashboard')
+    }
+  }, [user, profile, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setSessionExpired(false)
 
     try {
       const supabase = createClient()
@@ -38,8 +66,7 @@ export default function LoginPage() {
       }
 
       toast.success('Bienvenido!')
-      router.push('/dashboard')
-      router.refresh()
+      // La navegación ocurrirá automáticamente via el useEffect cuando user y profile estén disponibles
     } catch {
       toast.error('Error al iniciar sesion. Intenta de nuevo.')
     } finally {
@@ -60,6 +87,14 @@ export default function LoginPage() {
       </CardHeader>
       <form onSubmit={handleLogin}>
         <CardContent className="space-y-4">
+          {sessionExpired && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Tu sesion expiro por inactividad. Por favor, inicia sesion nuevamente.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -97,23 +132,12 @@ export default function LoginPage() {
               'Ingresar'
             )}
           </Button>
-          <div className="flex flex-col gap-2 text-center text-sm">
-            <Link
-              href="/forgot-password"
-              className="text-green-600 hover:text-green-700 hover:underline"
-            >
-              Olvidaste tu contrasena?
-            </Link>
-            <span className="text-muted-foreground">
-              No tienes cuenta?{' '}
-              <Link
-                href="/register"
-                className="text-green-600 hover:text-green-700 hover:underline"
-              >
-                Registrate
-              </Link>
-            </span>
-          </div>
+          <Link
+            href="/forgot-password"
+            className="text-sm text-primary hover:underline"
+          >
+            Olvidaste tu contrasena?
+          </Link>
         </CardFooter>
       </form>
     </Card>

@@ -194,7 +194,7 @@ export default function NewPigPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="purchase_weight">Peso (kg)</Label>
+                      <Label htmlFor="purchase_weight">Peso (lb)</Label>
                       <Input
                         id="purchase_weight"
                         type="number"
@@ -358,7 +358,7 @@ export default function NewPigPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="average_weight">Peso Promedio (kg)</Label>
+                      <Label htmlFor="average_weight">Peso Promedio (lb)</Label>
                       <Input
                         id="average_weight"
                         type="number"

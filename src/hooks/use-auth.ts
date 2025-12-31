@@ -1,88 +1,61 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, invalidateClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 
 export function useAuth() {
   const router = useRouter()
-  const { user, profile, loading, setUser, setProfile, setLoading, reset } = useAuthStore()
-
-  useEffect(() => {
-    const supabase = createClient()
-
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (session?.user) {
-        setUser(session.user)
-
-        // Fetch profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-
-        if (profileData) {
-          setProfile(profileData)
-        }
-      }
-
-      setLoading(false)
-    }
-
-    getInitialSession()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user)
-
-          // Fetch profile
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-
-          if (profileData) {
-            setProfile(profileData)
-          }
-        } else if (event === 'SIGNED_OUT') {
-          reset()
-        }
-      }
-    )
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [setUser, setProfile, setLoading, reset])
+  const {
+    user,
+    profile,
+    session,
+    loading,
+    initialized,
+    isRefreshing,
+    setProfile,
+    reset
+  } = useAuthStore()
 
   const signOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    reset()
-    router.push('/login')
-    router.refresh()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+
+      // Invalidar cliente para obtener instancia fresca
+      invalidateClient()
+
+      // Limpiar cookie de actividad
+      document.cookie = 'last_activity=; Max-Age=0; path=/'
+
+      reset()
+      router.push('/login')
+      router.refresh()
+    } catch (error) {
+      console.error('Error signing out:', error)
+      // Force reset even on error
+      invalidateClient()
+      reset()
+      router.push('/login')
+    }
   }
 
   const refreshProfile = async () => {
     if (!user) return
 
-    const supabase = createClient()
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+    try {
+      const supabase = createClient()
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
 
-    if (profileData) {
-      setProfile(profileData)
+      if (profileData) {
+        setProfile(profileData)
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error)
     }
   }
 
@@ -93,7 +66,10 @@ export function useAuth() {
   return {
     user,
     profile,
+    session,
     loading,
+    initialized,
+    isRefreshing,
     signOut,
     refreshProfile,
     isAdmin,

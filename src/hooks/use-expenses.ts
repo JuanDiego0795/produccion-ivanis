@@ -119,21 +119,23 @@ export function useFinancialSummary() {
       const supabase = createClient()
 
       // Fetch expenses
-      const { data: expenses, error: expensesError } = await supabase
+      const { data: expensesData, error: expensesError } = await supabase
         .from('expenses')
         .select('*')
         .order('date', { ascending: true })
 
       if (expensesError) throw expensesError
+      const expenses = expensesData as Array<{ amount: number; type: string; date: string }> | null
 
       // Fetch sold pigs for income
-      const { data: soldPigs, error: pigsError } = await supabase
+      const { data: soldPigsData, error: pigsError } = await supabase
         .from('pigs')
         .select('sale_price, sale_date')
         .eq('status', 'sold')
         .not('sale_price', 'is', null)
 
       if (pigsError) throw pigsError
+      const soldPigs = soldPigsData as Array<{ sale_price: number; sale_date: string | null }> | null
 
       // Calculate totals
       const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0

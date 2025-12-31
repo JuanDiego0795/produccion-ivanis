@@ -52,7 +52,7 @@ export default function PigsPage() {
             </div>
             <div className="text-right">
               <p className="font-medium">
-                {pig.current_weight ? `${pig.current_weight} kg` : '-'}
+                {pig.current_weight ? `${pig.current_weight} lb` : '-'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {format(new Date(pig.purchase_date), 'd MMM', { locale: es })}

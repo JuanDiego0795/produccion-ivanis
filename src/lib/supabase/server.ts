@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import type { User, Session } from '@supabase/supabase-js'
+import type { Profile } from '@/types/database'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -25,4 +27,35 @@ export async function createClient() {
       },
     }
   )
+}
+
+// Tipo para el estado de auth del servidor
+export interface ServerAuthState {
+  user: User | null
+  profile: Profile | null
+  session: Session | null
+}
+
+// Obtiene el estado completo de auth para hidratar el cliente
+export async function getServerAuthState(): Promise<ServerAuthState> {
+  const supabase = await createClient()
+
+  // Usar getUser() en vez de getSession() - más seguro
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    return { user: null, profile: null, session: null }
+  }
+
+  // Cargar perfil del usuario
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  // Obtener sesión con tokens
+  const { data: { session } } = await supabase.auth.getSession()
+
+  return { user, profile, session }
 }

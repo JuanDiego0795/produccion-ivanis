@@ -183,7 +183,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-3 text-center">
               <Scale className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-lg font-bold">{avgWeight.toFixed(0)} kg</div>
+              <div className="text-lg font-bold">{avgWeight.toFixed(0)} lb</div>
               <p className="text-xs text-muted-foreground">Peso prom.</p>
             </CardContent>
           </Card>

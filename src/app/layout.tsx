@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: "Produccion Ivanis - Sistema de Gestion Porcina",
   description: "Sistema de administracion para crianza y venta de cerdos",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon.svg",
+    apple: "/icons/icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -25,7 +29,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#16a34a",
+  themeColor: "#3b82f6",
 }
 
 export default function RootLayout({
