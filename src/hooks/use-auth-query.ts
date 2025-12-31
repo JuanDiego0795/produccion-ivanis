@@ -52,19 +52,26 @@ export function useAuthQuery<T>({
   const retriesRef = useRef(0)
   const lastFetchRef = useRef<number>(0)
 
+  // Usar ref para queryFn para evitar problemas de dependencias
+  const queryFnRef = useRef(queryFn)
+  queryFnRef.current = queryFn
+
   const execute = useCallback(async () => {
     // Gate 1: Auth debe estar listo
     if (!isAuthReady) {
+      console.log('[useAuthQuery] Waiting for auth to be ready')
       return
     }
 
     // Gate 2: No fetch durante token refresh
     if (isRefreshing) {
+      console.log('[useAuthQuery] Token is refreshing, waiting...')
       return
     }
 
     // Gate 3: Debe haber usuario para datos protegidos
     if (!user) {
+      console.log('[useAuthQuery] No user, skipping fetch')
       setLoading(false)
       setData(null)
       return
@@ -89,7 +96,7 @@ export function useAuthQuery<T>({
 
     try {
       const supabase = createClient()
-      const result = await queryFn(supabase)
+      const result = await queryFnRef.current(supabase)
 
       if (isMountedRef.current) {
         setData(result)
@@ -98,6 +105,7 @@ export function useAuthQuery<T>({
     } catch (err) {
       if (!isMountedRef.current) return
 
+      console.error('[useAuthQuery] Query error:', err)
       const authErr = isAuthErrorCode(err)
       setIsAuthError(authErr)
 
@@ -105,6 +113,7 @@ export function useAuthQuery<T>({
         if (retriesRef.current < 1) {
           // Reintentar una vez (el token podria estar refrescandose)
           retriesRef.current++
+          console.log('[useAuthQuery] Auth error, retrying in 1.5s...')
           setTimeout(() => {
             if (isMountedRef.current) {
               execute()
@@ -114,7 +123,7 @@ export function useAuthQuery<T>({
         }
 
         // Error de auth despues de reintento - hacer logout
-        console.warn('Auth error after retry, logging out')
+        console.warn('[useAuthQuery] Auth error after retry, logging out')
         reset()
         return
       }
@@ -125,7 +134,7 @@ export function useAuthQuery<T>({
         setLoading(false)
       }
     }
-  }, [isAuthReady, isRefreshing, user, enabled, queryFn, retryOnAuthError, reset])
+  }, [isAuthReady, isRefreshing, user, enabled, retryOnAuthError, reset])
 
   // Cleanup
   useEffect(() => {

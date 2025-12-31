@@ -32,13 +32,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isMountedRef = useRef(true)
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
-  // Referencia al cliente para evitar crear nuevas instancias
-  const supabaseRef = useRef(createClient())
+  // Referencia al cliente - inicializacion lazy para evitar errores si env vars no estan listas
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  // Obtener cliente de forma segura
+  const getSupabase = useCallback(() => {
+    if (!supabaseRef.current) {
+      console.log('[AuthProvider] Creating Supabase client')
+      supabaseRef.current = createClient()
+    }
+    return supabaseRef.current
+  }, [])
 
   // Fetch profile con reintentos
   const fetchProfile = useCallback(async (userId: string, retries = 0): Promise<boolean> => {
     try {
-      const { data: profileData, error } = await supabaseRef.current
+      const supabase = getSupabase()
+      const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -71,7 +81,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.warn('Profile fetch exception:', error)
       return false
     }
-  }, [setProfile, setAuthError])
+  }, [getSupabase, setProfile, setAuthError])
 
   // Funcion para refrescar la sesion
   const refreshSession = useCallback(async () => {
@@ -80,7 +90,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setRefreshing(true)
 
     try {
-      const { data: { session: newSession }, error } = await supabaseRef.current.auth.refreshSession()
+      const supabase = getSupabase()
+      const { data: { session: newSession }, error } = await supabase.auth.refreshSession()
 
       if (error) {
         console.warn('Session refresh error:', error.message)
@@ -102,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRefreshing(false)
       }
     }
-  }, [setSession, setUser, setRefreshing, setAuthReady, reset])
+  }, [getSupabase, setSession, setUser, setRefreshing, setAuthReady, reset])
 
   // Configurar refresh proactivo basado en expiracion del token
   const setupProactiveRefresh = useCallback((expiresAt: number) => {
@@ -126,9 +137,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isMountedRef.current = true
 
     const initializeAuth = async () => {
+      console.log('[AuthProvider] Starting auth initialization')
       try {
+        const supabase = getSupabase()
         // Usar getUser() - mas seguro que getSession()
-        const { data: { user: authUser }, error } = await supabaseRef.current.auth.getUser()
+        const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
         if (error) {
           console.warn('Auth error:', error.message)
@@ -143,10 +156,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!isMountedRef.current) return
 
         if (authUser) {
+          console.log('[AuthProvider] User found:', authUser.email)
           setUser(authUser)
 
           // Obtener sesion para tokens
-          const { data: { session: authSession } } = await supabaseRef.current.auth.getSession()
+          const { data: { session: authSession } } = await supabase.auth.getSession()
           if (authSession) {
             setSession(authSession)
             if (authSession.expires_at) {
@@ -159,10 +173,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
           // IMPORTANTE: Marcar auth ready incluso si profile fallo
           if (isMountedRef.current) {
+            console.log('[AuthProvider] Auth ready (user authenticated)')
             setAuthReady(true)
           }
         } else {
           // No hay usuario - ready para login page
+          console.log('[AuthProvider] No user found, ready for login')
           if (isMountedRef.current) {
             setAuthReady(true)
           }
@@ -188,7 +204,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth()
 
     // Listener para cambios de auth
-    const { data: { subscription } } = supabaseRef.current.auth.onAuthStateChange(
+    const supabase = getSupabase()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, newSession: Session | null) => {
         if (!isMountedRef.current) return
 
@@ -231,7 +248,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         clearTimeout(refreshTimerRef.current)
       }
     }
-  }, [setUser, setProfile, setSession, setLoading, setInitialized, setAuthReady, setAuthError, reset, setupProactiveRefresh, fetchProfile])
+  }, [getSupabase, setUser, setProfile, setSession, setLoading, setInitialized, setAuthReady, setAuthError, reset, setupProactiveRefresh, fetchProfile])
 
   // Heartbeat: verificar sesion cada 5 minutos
   useEffect(() => {
@@ -274,7 +291,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const handleStorageChange = async (e: StorageEvent) => {
       if (e.key?.includes('supabase.auth')) {
         // Usa el cliente existente (no crea nuevo)
-        const { data: { user: currentUser } } = await supabaseRef.current.auth.getUser()
+        const supabase = getSupabase()
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
         if (!currentUser && user) {
           reset()
           setAuthReady(true)
@@ -287,7 +305,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       window.removeEventListener('storage', handleStorageChange)
     }
-  }, [user, reset, setAuthReady])
+  }, [user, getSupabase, reset, setAuthReady])
 
   return <>{children}</>
 }
